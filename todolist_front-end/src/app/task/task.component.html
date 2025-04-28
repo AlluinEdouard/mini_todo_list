@@ -1,0 +1,43 @@
+<div class="task-form">
+  <form [formGroup]="taskForm"> <!-- lit le template au Formgroup-->
+    <div class="input-group">
+      <input type="text" formControlName="title" placeholder="Titre...">
+      <div class="error-message" *ngIf="titleControl?.invalid && (titleControl?.dirty || titleControl?.touched)">
+        <span *ngIf="titleControl?.errors?.['required']">Le titre est requis</span>
+        <span *ngIf="titleControl?.errors?.['minlength']">Le titre doit contenir au moins 3 caractères</span>
+      </div>
+    </div>
+    
+    <div class="input-group description-group">
+      <input type="text" formControlName="description" placeholder="Description..." rows="3">
+      <div class="error-message" *ngIf="descriptionControl?.invalid && (descriptionControl?.dirty || descriptionControl?.touched)">
+        <span *ngIf="descriptionControl?.errors?.['required']">La description est requise</span>
+        <span *ngIf="descriptionControl?.errors?.['minlength']">La description doit contenir au moins 3 caractères</span>
+      </div>
+    </div>
+    
+    <div class="input-group image-url-group">
+      <input type="text" formControlName="imageURL" placeholder="Lien http(s) de l'image...">
+      <div class="error-message" *ngIf="imageURLControl?.invalid && (imageURLControl?.dirty || imageURLControl?.touched)">
+        <span *ngIf="imageURLControl?.errors?.['required']">L'URL de l'image est requise</span>
+        <span *ngIf="imageURLControl?.errors?.['pattern']">Veuillez entrer une URL valide commençant par http:// ou https://</span>
+      </div>
+    </div>
+    
+    <button (click)="addTask()" [disabled]="taskForm.invalid">Ajouter</button>
+  </form>
+</div>
+
+<div *ngFor="let task of tasks" class="task-card"> 
+  <h2>{{ task.title }}</h2>
+  <h5>Publié le {{ task.createdAt | date }}</h5>
+  <img [src]="task.imageURL" [alt]="task.title">
+  <p>{{ task.description }}</p>
+  <p>
+    <button (click)="onTask(task)">{{task.taskButtonText}}</button>
+    {{ task.valid }}
+  </p>
+  <p>
+    <button (click)="deleteTask(task)">{{ task.ButtonDelete }}</button>
+  </p>
+</div>
