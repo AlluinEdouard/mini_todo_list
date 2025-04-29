@@ -1,63 +1,44 @@
-import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface Task {
-  id?: string;
+  id: number;
   title: string;
   description: string;
-  imageURL?: string;
-  completed?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  // Propriétés spécifiques à l'interface utilisateur
+  createdAt?: Date;
   valid?: string;
+  imageURL?: string;
   taskButtonText?: string;
   userHasPressed?: boolean;
   ButtonDelete?: string;
 }
-
+//permet d'injecter ce service à la racine de l'application
 @Injectable({
   providedIn: 'root'
 })
 export class TaskService {
-  private apiUrl = 'http://localhost:3000/api/tasks';
+  private apiUrl = 'http://localhost:3000/tasks';
 
   constructor(private http: HttpClient) { }
 
-  // Récupérer toutes les tâches
+  // GET : récupérer toutes les tâches
   getTasks(): Observable<Task[]> {
     return this.http.get<Task[]>(this.apiUrl);
   }
 
-  // Ajouter une nouvelle tâche
-  addTask(task: Task): Observable<Task> {
-    return this.http.post<Task>(this.apiUrl, task);
+  // POST : ajouter une nouvelle tâche
+  addTask(task: Task): Observable<any> {
+    return this.http.post<any>(this.apiUrl, task);
   }
 
-  // Mettre à jour une tâche
-  updateTask(task: Task): Observable<Task> {
-    return this.http.put<Task>(`${this.apiUrl}/${task.id}`, task);
+  // PUT : modifier une tâche
+  updateTask(task: Task): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/${task.id}`, task);
   }
 
-  // Supprimer une tâche
-  deleteTask(id: string): Observable<any> {
+  // DELETE : supprimer une tâche
+  deleteTask(id: number): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/${id}`);
-  }
-
-  // Méthode pour transformer les données du backend vers le format du frontend
-  transformTaskResponse(task: any): Task {
-    return {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      imageURL: task.imageURL || 'https://via.placeholder.com/150',
-      createdAt: task.createdAt,
-      completed: task.completed || false,
-      valid: task.completed ? '✅' : '❌',
-      taskButtonText: task.completed ? 'Tâche finit !' : 'Tâche non finit !',
-      userHasPressed: task.completed || false,
-      ButtonDelete: 'Supprimer la tâche'
-    };
   }
 }

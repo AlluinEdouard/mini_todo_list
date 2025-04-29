@@ -1,6 +1,8 @@
 import { DatePipe, NgFor, NgIf } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { TaskService, Task } from '../task.service';
+import { HttpClientModule } from '@angular/common/http';
 
 @Component({
   selector: 'app-task',
@@ -10,27 +12,26 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
     NgFor,
     NgIf,
     ReactiveFormsModule,
+    HttpClientModule,
   ],
   templateUrl: './task.component.html',
-  styleUrl: './task.component.scss'
+  styleUrl: './task.component.scss',
+  providers: [TaskService]
 })
 export class TaskComponent implements OnInit {
-  tasks: {
-    title: string;
-    description: string;
-    createdAt: Date;
-    valid: string;
-    imageURL: string;
-    taskButtonText: string;
-    userHasPressed: boolean;
-    ButtonDelete: string;
-  }[] = [];
+  tasks: Task[] = [];
+  nextId = 1; // Pour gérer les IDs localement
 
   // Le FormGroup est un conteneur qui regroupe plusieurs contrôles de formulaire
   taskForm: FormGroup;
+  editTaskform: FormGroup;
+  editingTask: Task | null = null;
 
   // Le FormBuilder est un service qui simplifie la création de formulaires complexes
-  constructor(private fb: FormBuilder) {
+  constructor(
+    private fb: FormBuilder,
+    private taskService: TaskService
+  ) {
     // c'est plus complexe mais court et robuste. Sa évite de faire une méthode pour valider l'url.
     const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
 
@@ -40,58 +41,68 @@ export class TaskComponent implements OnInit {
       description: ['', [Validators.required, Validators.minLength(3)]],
       imageURL: ['', [Validators.required, Validators.pattern(urlRegex)]]
     });
+
+    this.editTaskform = this.fb.group({
+      title: ['', [Validators.required, Validators.minLength(3)]],
+      description: ['', [Validators.required, Validators.minLength(3)]],
+      imageURL: ['', [Validators.required, Validators.pattern(urlRegex)]]
+    });
   }
 
   ngOnInit(): void {
-    this.tasks = [
-      {
-        title: 'Aspirer et laver la maison',
-        description: 'Il faudra acheter les produits chez Auchan',
-        createdAt: new Date(),
-        valid: '❌',
-        imageURL: 'https://www.bissell.fr/media/mageplaza/blog/post/f/1/f1529259436c3d37ec5535d22343c097_1.jpg',
-        taskButtonText: 'Tâche non finit !',
-        userHasPressed: false,
-        ButtonDelete: 'Supprimer la tâche'
-      },
-      {
-        title: 'Faire les devoirs Angular',
-        description: 'Finir le projet de mini To-Do list',
-        createdAt: new Date(),
-        valid: '❌',
-        imageURL: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Angular_full_color_logo.svg/1200px-Angular_full_color_logo.svg.png',
-        taskButtonText: 'Tâche non finit !',
-        userHasPressed: false,
-        ButtonDelete: 'Supprimer la tâche'
-      },
-      {
-        title: 'Préparer le repas',
-        description: 'Sortir les ingrédients et cuisiner un bon plat',
-        createdAt: new Date(),
-        valid: '❌',
-        imageURL: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTj17gMlP7ASNtgihPWL0xCrzdFskP6UErbWQ&s',
-        taskButtonText: 'Tâche non finit !',
-        userHasPressed: false,
-        ButtonDelete: 'Supprimer la tâche'
-      }
-    ];
+    // Charger les tâches depuis l'API
+    this.loadTasks();
   }
 
-  onTask(task: any): void {
+  loadTasks(): void {
+    this.taskService.getTasks().subscribe({
+      next: (apiTasks) => {
+        // Si l'API retourne des tâches avec juste id et title (selon le format du backend)
+        // On les convertit au format attendu par le frontend
+        this.tasks = apiTasks.map(task => {
+          return {
+            ...task,
+            valid: task.valid || '❌',
+            taskButtonText: task.taskButtonText || 'Tâche non finit !',
+            userHasPressed: task.userHasPressed || false,
+            ButtonDelete: task.ButtonDelete || 'Supprimer la tâche',
+            createdAt: task.createdAt ? new Date(task.createdAt) : new Date()
+          };
+        });
+        
+        // Déterminer le prochain ID à utiliser
+        if (this.tasks.length > 0) {
+          const maxId = Math.max(...this.tasks.map(t => t.id));
+          this.nextId = maxId + 1;
+        }
+      },
+      error: (err) => {
+        console.error('Erreur lors du chargement des tâches', err);
+      }
+    });
+  }
+
+
+  onTask(task: Task): void {
     if (task.userHasPressed) {
       this.unTask(task);
     } else {
       this.task(task);
     }
+
+    // Mettre à jour la tâche dans l'API
+    this.taskService.updateTask(task).subscribe({
+      error: (err) => console.error('Erreur lors de la mise à jour de la tâche', err)
+    });
   }
 
-  unTask(task: any) {
+  unTask(task: Task) {
     task.valid = '❌';
     task.taskButtonText = 'Tâche non finit !';
     task.userHasPressed = false;
   }
 
-  task(task: any) {
+  task(task: Task) {
     task.valid = '✅';
     task.taskButtonText = 'Tâche finit !';
     task.userHasPressed = true;
@@ -107,7 +118,8 @@ export class TaskComponent implements OnInit {
     if (this.taskForm.valid) {
       const formValues = this.taskForm.value;
       
-      this.tasks.unshift({ // le unshift ajoute un élément au début du tableau
+      const newTask: Task = {
+        id: this.nextId++,
         title: formValues.title,
         description: formValues.description,
         createdAt: new Date(),
@@ -116,17 +128,60 @@ export class TaskComponent implements OnInit {
         taskButtonText: 'Tâche non finit !',
         userHasPressed: false,
         ButtonDelete: 'Supprimer la tâche'
-      });
+      };
       
-      this.taskForm.reset();
+      // Ajouter la tâche via l'API
+      this.taskService.addTask(newTask).subscribe({
+        next: () => {
+          // Succès: ajout local et réinitialisation du formulaire
+          this.tasks.unshift(newTask);
+          this.taskForm.reset();
+        },
+        error: (err) => {
+          console.error('Erreur lors de l\'ajout de la tâche', err);
+          // Erreur: ajout local quand même et log de l'erreur
+          this.tasks.unshift(newTask);
+          this.taskForm.reset();
+        }
+      });
     }
   }
 
-  deleteTask(ButtonDelete: any) {
-    const index = this.tasks.findIndex(task => task === ButtonDelete);
-
-    if (index !== -1) {
-      this.tasks.splice(index, 1);
+  updateTask(tasktoUpdate: Task) {
+    if (!tasktoUpdate.id) {
+      console.error('Impossible de modifier une tâche sans ID');
+      return;
     }
+
+    this.taskService.updateTask(tasktoUpdate).subscribe({
+      next: () => {
+
+      }
+    })
+  }
+
+  deleteTask(taskToDelete: Task) {
+    if (!taskToDelete.id) {
+      console.error('Impossible de supprimer une tâche sans ID');
+      return;
+    }
+    
+    this.taskService.deleteTask(taskToDelete.id).subscribe({
+      next: () => {
+        // Supprimer de l'affichage local
+        const index = this.tasks.findIndex(task => task === taskToDelete);
+        if (index !== -1) {
+          this.tasks.splice(index, 1);
+        }
+      },
+      error: (err) => {
+        console.error('Erreur lors de la suppression de la tâche', err);
+        // Supprimer quand même en local en cas d'erreur
+        const index = this.tasks.findIndex(task => task === taskToDelete);
+        if (index !== -1) {
+          this.tasks.splice(index, 1);
+        }
+      }
+    });
   }
 }
